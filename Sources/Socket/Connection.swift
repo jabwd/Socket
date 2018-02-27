@@ -27,6 +27,7 @@ public class Connection {
         status = .connected
         
         socket.delegate = self
+		socket.startReading()
     }
     
     deinit {

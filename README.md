@@ -1,7 +1,7 @@
 # Socket
 
 My personal Swift Dispatch socket implementation.
-This is a playground and **b not meant for production implementations**.
+This is a playground and **not meant for production implementations**.
 
 ### So why bother when better solutions exist
 

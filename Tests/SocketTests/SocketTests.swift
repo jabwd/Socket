@@ -10,9 +10,7 @@ class SocketTests: XCTestCase {
         
         let server = try? Server(port: 2553)
         
-        let group = DispatchGroup()
-        group.enter()
-        group.wait()
+        Runloop.shared.run()
         
         XCTAssert(true)
     }

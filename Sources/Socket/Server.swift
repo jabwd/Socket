@@ -13,8 +13,10 @@ class Server: SocketDelegate {
 
     private var currentIndex: Int
     private let syncQueue: DispatchQueue
+	private let syncGroup: DispatchGroup
     
     init(port: UInt16) throws {
+		syncGroup = DispatchGroup()
         connections = [:]
         currentIndex = 0
         syncQueue = DispatchQueue(label: "serverSyncQueue")
@@ -25,21 +27,26 @@ class Server: SocketDelegate {
     
     func socketDidAcceptNewClient(_ socket: Socket, client: Socket) {
         print("[\(type(of: self))] New socket accepted")
-        syncQueue.sync {
-            let conn = Connection(server: self, index: currentIndex, socket: client)
-            connections[currentIndex] = conn
-            currentIndex += 1
-            print("[\(type(of: self))] Connection opened: \(connections.count) (Since start: \(currentIndex))")
-        }
+		syncGroup.enter()
+		let conn = Connection(server: self, index: currentIndex, socket: client)
+		syncQueue.sync {
+			connections[currentIndex] = conn
+			currentIndex += 1
+			print("[\(type(of: self))] Connection opened: \(connections.count) (Since start: \(currentIndex))")
+			syncGroup.leave()
+		}
+		syncGroup.wait()
     }
     
     // MARK: -
     
     func connectionWillClose(_ connection: Connection) {
+		syncGroup.enter()
         syncQueue.sync {
             connections.removeValue(forKey: connection.index)
             print("[\(type(of: self))] Connection closed: \(connections.count)")
-            return
+            syncGroup.leave()
         }
+		syncGroup.wait()
     }
 }

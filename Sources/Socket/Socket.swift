@@ -34,36 +34,20 @@ public class Socket {
 		#else
 			fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
 		#endif
-        workQueue = DispatchQueue(label: "workQueue.\(fd)")
+        workQueue = WorkQueuePool.shared.nextQueue
 	}
 	
 	private init(fd: Int32) {
 		self.fd = fd
-        workQueue = DispatchQueue(label: "workQueue.\(fd)")
+        workQueue = WorkQueuePool.shared.nextQueue
         makeNonBlocking(fd: fd)
-        
-        readingSource = DispatchSource.makeReadSource(fileDescriptor: fd, queue: workQueue)
-        readingSource?.setEventHandler() {
-            self.readAvailableData()
-        }
-        readingSource?.setCancelHandler() {
-            self.readingSource = nil
-        }
-        readingSource?.resume()
-        writingSource = DispatchSource.makeWriteSource(fileDescriptor: fd, queue: workQueue)
-        writingSource?.setEventHandler() {
-            self.writingSource?.suspend()
-            self.canWrite = true
-            self.checkWriteQueue()
-        }
-        writingSource?.setCancelHandler() {
-            self.writingSource = nil
-        }
-        writingSource?.resume()
-        isOpen = true
+		
+		isOpen = true
+        createWritingSource()
 	}
     
     deinit {
+		print("Socket is gone!")
     }
 	
 	// MARK: - Listening
@@ -150,13 +134,7 @@ public class Socket {
             self.readAvailableData()
         }))
         readingSource?.resume()
-        writingSource = DispatchSource.makeWriteSource(fileDescriptor: fd, queue: workQueue)
-        writingSource?.setEventHandler(handler: DispatchWorkItem(block: {
-            self.writingSource?.suspend()
-            self.canWrite = true
-            self.checkWriteQueue()
-        }))
-        writingSource?.resume()
+        createWritingSource()
         isOpen = true
 	}
     
@@ -182,12 +160,30 @@ public class Socket {
 // MARK: - Reading and accepting
 
 extension Socket {
+	func startReading() {
+		readingSource = DispatchSource.makeReadSource(fileDescriptor: fd, queue: workQueue)
+		readingSource?.setEventHandler() {
+			self.readAvailableData()
+		}
+		readingSource?.setCancelHandler() {
+			self.readingSource = nil
+		}
+		readingSource?.resume()
+	}
+	
     func readAvailableData() {
+		print("Should be reading available data!")
         guard isOpen == true else {
             return
         }
         isReading = true
-        let buffSize = 1024
+		defer {
+			isReading = false
+			if shouldClose == true {
+				finalizeClose()
+			}
+		}
+        let buffSize = 2084
         
         // Using UnsafeMutablePointer here crashes for some reason.
         var buffer: [UInt8] = [UInt8](repeating: 0, count: 0)
@@ -199,17 +195,13 @@ extension Socket {
                 buffer += Array(UnsafeMutableBufferPointer(start: part, count: len))
             }
             part.deallocate(capacity: buffSize)
-        } while( len == 512 );
+        } while( len == buffSize );
         if len <= 0 {
             disconnect()
             return
         }
-        
+		print("Delegate: \(delegate)")
         delegate?.socketDidReadBytes(self, bytes: buffer)
-        isReading = false
-        if shouldClose == true {
-            finalizeClose()
-        }
     }
     
     func acceptNewClient() {
@@ -239,10 +231,26 @@ extension Socket {
 // MARK: - Writing data
 
 extension Socket {
+	
+	fileprivate func createWritingSource() {
+		guard writingSource == nil else { return }
+		
+		writingSource = DispatchSource.makeWriteSource(fileDescriptor: fd, queue: workQueue)
+		writingSource?.setEventHandler {
+			self.writingSource?.cancel()
+			self.canWrite = true
+			self.checkWriteQueue()
+		}
+		writingSource?.setCancelHandler {
+			self.writingSource = nil
+		}
+		writingSource?.resume()
+	}
     
     public func send(bytes: [UInt8]) {
+		guard bytes.count > 0 else { return }
         sendBuffer += bytes
-        checkWriteQueue()
+		checkWriteQueue()
     }
     
     private func checkWriteQueue() {
@@ -250,6 +258,7 @@ extension Socket {
             return
         }
         guard canWrite == true else {
+			createWritingSource()
             return
         }
         guard sendBuffer.count > 0 else { return }
@@ -264,7 +273,6 @@ extension Socket {
         if bytesWritten > 0 {
             sendBuffer.removeFirst(bytesWritten)
         }
-        writingSource?.resume()
         isWriting = false
         if shouldClose == true {
             finalizeClose()
