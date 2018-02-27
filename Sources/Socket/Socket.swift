@@ -172,8 +172,6 @@ public class Socket {
         isOpen = false
         delegate?.socketWillDisconnect(self)
         readingSource?.cancel()
-        writingSource?.resume() // itty bitty hacky
-        writingSource?.cancel()
         
         shutdown(fd, SHUT_RDWR)
         close(fd)
