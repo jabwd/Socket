@@ -47,7 +47,6 @@ public class Socket {
 	}
     
     deinit {
-		print("Socket is gone!")
     }
 	
 	// MARK: - Listening
@@ -172,7 +171,6 @@ extension Socket {
 	}
 	
     func readAvailableData() {
-		print("Should be reading available data!")
         guard isOpen == true else {
             return
         }
@@ -200,7 +198,6 @@ extension Socket {
             disconnect()
             return
         }
-		print("Delegate: \(delegate)")
         delegate?.socketDidReadBytes(self, bytes: buffer)
     }
     

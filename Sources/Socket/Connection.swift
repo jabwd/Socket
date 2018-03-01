@@ -15,10 +15,16 @@ public class Connection {
     }
     
     public let index: Int
-    private(set) var status: Connection.Status
+    private(set) var status: Connection.Status {
+        didSet {
+            delegate?.connectionStatusChanged(self, status: status)
+        }
+    }
     
     private let socket: Socket
     private weak var server: Server?
+    
+    public weak var delegate: ConnectionDelegate?
     
     init(server: Server, index: Int, socket: Socket) {
         self.index  = index
@@ -40,15 +46,18 @@ public class Connection {
         }
         socket.disconnect()
     }
+    
+    func send(bytes: [UInt8]) {
+        socket.send(bytes: bytes)
+    }
 }
 
 extension Connection: SocketDelegate {
     public func socketDidReadBytes(_ socket: Socket, bytes: [UInt8]) {
-        print("Read some bytes: \(bytes)")
-        
-        let response = "HTTP/1.1 200 OK\r\nServer: Exurion (unix)\r\nConnection: closed"
+        /*let response = "HTTP/1.1 200 OK\r\nServer: Exurion (unix)\r\nConnection: closed"
         socket.send(bytes: Array(response.utf8))
-        socket.disconnect()
+        socket.disconnect()*/
+        delegate?.connectionDidReceiveBytes(self, bytes: bytes)
     }
     
     public func socketDidDisconnect(_ socket: Socket) {

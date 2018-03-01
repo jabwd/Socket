@@ -26,7 +26,6 @@ class Server: SocketDelegate {
     }
     
     func socketDidAcceptNewClient(_ socket: Socket, client: Socket) {
-        print("[\(type(of: self))] New socket accepted")
 		syncGroup.enter()
 		let conn = Connection(server: self, index: currentIndex, socket: client)
 		syncQueue.sync {
