@@ -6,6 +6,8 @@
 //
 import Dispatch
 
+public typealias ServerConnectionCallback = (Connection) -> Void
+
 public class Server: SocketDelegate {
     
     private let listeningSocket: Socket
@@ -14,6 +16,8 @@ public class Server: SocketDelegate {
     private var currentIndex: Int
     private let syncQueue: DispatchQueue
 	private let syncGroup: DispatchGroup
+    
+    public var onConnect: ServerConnectionCallback? = nil
     
     public init(port: UInt16) throws {
 		syncGroup = DispatchGroup()
@@ -33,6 +37,7 @@ public class Server: SocketDelegate {
 			currentIndex += 1
 			print("[\(type(of: self))] Connection opened: \(connections.count) (Since start: \(currentIndex))")
 			syncGroup.leave()
+            onConnect?(conn)
 		}
 		syncGroup.wait()
     }

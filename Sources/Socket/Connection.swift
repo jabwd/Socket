@@ -33,10 +33,13 @@ public class Connection {
         status = .connected
         
         socket.delegate = self
-		socket.startReading()
     }
     
     deinit {
+    }
+    
+    public func startReading() {
+        socket.startReading()
     }
     
     public func close() {
