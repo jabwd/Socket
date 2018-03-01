@@ -26,7 +26,7 @@ public class Connection {
     
     public weak var delegate: ConnectionDelegate?
     
-    init(server: Server, index: Int, socket: Socket) {
+    public init(server: Server, index: Int, socket: Socket) {
         self.index  = index
         self.socket = socket
         self.server = server
@@ -39,7 +39,7 @@ public class Connection {
     deinit {
     }
     
-    func close() {
+    public func close() {
         guard status != .disconnected else {
             server?.connectionWillClose(self)
             return
@@ -47,7 +47,7 @@ public class Connection {
         socket.disconnect()
     }
     
-    func send(bytes: [UInt8]) {
+    public func send(bytes: [UInt8]) {
         socket.send(bytes: bytes)
     }
 }

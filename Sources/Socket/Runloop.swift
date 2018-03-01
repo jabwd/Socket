@@ -16,11 +16,11 @@ public class Runloop {
         group.enter()
     }
     
-    func run() {
+    public func run() {
         group.wait()
     }
     
-    func stop() {
+    public func stop() {
         group.leave()
     }
 }

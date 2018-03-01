@@ -51,7 +51,7 @@ public class Socket {
 	
 	// MARK: - Listening
 	
-	func startListening(port: UInt16) throws -> Void {
+	public func startListening(port: UInt16) throws -> Void {
         socketType = .server
 		var address        = sockaddr_in()
 		address.sin_family = sa_family_t(UInt16(AF_INET))
@@ -105,7 +105,7 @@ public class Socket {
     
     // MARK: - Connecting
 	
-	func connect(host: String, port: UInt16) throws {
+	public func connect(host: String, port: UInt16) throws {
         socketType = .client
         var address = sockaddr_in()
         var info: UnsafeMutablePointer<addrinfo>?
@@ -128,16 +128,11 @@ public class Socket {
         
         makeNonBlocking(fd: fd)
         
-        readingSource = DispatchSource.makeReadSource(fileDescriptor: fd, queue: workQueue)
-        readingSource?.setEventHandler(handler: DispatchWorkItem(block: {
-            self.readAvailableData()
-        }))
-        readingSource?.resume()
         createWritingSource()
         isOpen = true
 	}
     
-    func disconnect() {
+    public func disconnect() {
         guard isWriting == false, isReading == false else {
             shouldClose = true
             return
@@ -159,7 +154,7 @@ public class Socket {
 // MARK: - Reading and accepting
 
 extension Socket {
-	func startReading() {
+	public func startReading() {
 		readingSource = DispatchSource.makeReadSource(fileDescriptor: fd, queue: workQueue)
 		readingSource?.setEventHandler() {
 			self.readAvailableData()

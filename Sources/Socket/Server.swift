@@ -6,7 +6,7 @@
 //
 import Dispatch
 
-class Server: SocketDelegate {
+public class Server: SocketDelegate {
     
     private let listeningSocket: Socket
     private var connections: [Int: Connection]
@@ -15,7 +15,7 @@ class Server: SocketDelegate {
     private let syncQueue: DispatchQueue
 	private let syncGroup: DispatchGroup
     
-    init(port: UInt16) throws {
+    public init(port: UInt16) throws {
 		syncGroup = DispatchGroup()
         connections = [:]
         currentIndex = 0
@@ -25,7 +25,7 @@ class Server: SocketDelegate {
         try listeningSocket.startListening(port: port)
     }
     
-    func socketDidAcceptNewClient(_ socket: Socket, client: Socket) {
+    public func socketDidAcceptNewClient(_ socket: Socket, client: Socket) {
 		syncGroup.enter()
 		let conn = Connection(server: self, index: currentIndex, socket: client)
 		syncQueue.sync {
