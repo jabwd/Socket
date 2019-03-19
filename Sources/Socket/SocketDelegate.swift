@@ -6,6 +6,7 @@
 //
 
 public protocol SocketDelegate: AnyObject {
+    var index: Int { get }
     func socketDidAcceptNewClient(_ socket: Socket, client: Socket)
     func socketDidReadBytes(_ socket: Socket, bytes: [UInt8])
     func socketWillDisconnect(_ socket: Socket)

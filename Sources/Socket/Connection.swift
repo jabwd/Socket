@@ -41,7 +41,7 @@ public class Connection {
 
     public func close() {
         guard status != .disconnected else {
-            server?.connectionWillClose(self)
+            server?.removeConnection(self)
             return
         }
         socket.disconnect()

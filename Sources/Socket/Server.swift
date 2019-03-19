@@ -6,13 +6,14 @@
 //
 import Dispatch
 
-public typealias ServerConnectionCallback = (Socket) -> SocketDelegate
+public typealias ServerConnectionCallback = (Socket, Int) -> SocketDelegate
 
 public class Server: SocketDelegate {
 
     private let listeningSocket: Socket
     private var connections: [Int: SocketDelegate]
 
+    public let index: Int = 0
     private var currentIndex: Int
     private let syncQueue: DispatchQueue
 	private let syncGroup: DispatchGroup
@@ -32,7 +33,7 @@ public class Server: SocketDelegate {
     public func socketDidAcceptNewClient(_ socket: Socket, client: Socket) {
 		syncGroup.enter()
 		syncQueue.sync {
-            guard let conn = self.newConnectionHandler?(client) else {
+            guard let conn = self.newConnectionHandler?(client, currentIndex) else {
                 return
             }
 			connections[currentIndex] = conn
@@ -45,7 +46,7 @@ public class Server: SocketDelegate {
 
     // MARK: -
 
-    func connectionWillClose(_ connection: Connection) {
+    public func removeConnection(_ connection: SocketDelegate) {
 		syncGroup.enter()
         syncQueue.sync {
             connections.removeValue(forKey: connection.index)

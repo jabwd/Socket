@@ -32,7 +32,8 @@ final class WorkQueuePool {
         }
         var dynamicPool: [DispatchQueue] = []
         for i in 0..<num {
-            dynamicPool.append(DispatchQueue(label: "exurion.work.\(i)"))
+            let queue = DispatchQueue(label: "exurion.work.\(i)")
+            dynamicPool.append(queue)
         }
 		pool = dynamicPool
 	}
