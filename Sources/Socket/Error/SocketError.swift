@@ -10,7 +10,9 @@ public enum SocketError: Error {
     case invalidFileDescriptor
     case alreadyBound
     case unknownError
-    
+
     case unableToResolveHost
     case unableToConnect
+
+    case unableToDetermineCoreCount
 }

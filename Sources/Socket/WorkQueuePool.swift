@@ -6,27 +6,34 @@
 //
 import Dispatch
 
-class WorkQueuePool {
-	static let shared = WorkQueuePool()
-	
+final class WorkQueuePool {
+    public static let shared = WorkQueuePool()
 	private let pool: [DispatchQueue]
 	private var currentIndex: Int = 0
-	
+
 	var nextQueue: DispatchQueue {
+        if currentIndex > pool.count {
+            currentIndex = 0
+        }
 		defer {
 			currentIndex += 1
 		}
 		return pool[currentIndex % pool.count]
 	}
-	
+
 	init() {
-		pool = [
-			DispatchQueue(label: "workQueue.0"),
-			DispatchQueue(label: "workQueue.1"),
-			DispatchQueue(label: "workQueue.2"),
-			DispatchQueue(label: "workQueue.3"),
-			DispatchQueue(label: "workQueue.4"),
-			DispatchQueue(label: "workQueue.5"),
-		]
+        let num = sysconf(_SC_NPROCESSORS_ONLN)
+        guard num > 0 else {
+            print("[Socket] Error: Unable to determine core count, falling back to 1 work queue.")
+            pool = [
+                DispatchQueue(label: "exurion.work.0")
+            ]
+            return
+        }
+        var dynamicPool: [DispatchQueue] = []
+        for i in 0..<num {
+            dynamicPool.append(DispatchQueue(label: "exurion.work.\(i)"))
+        }
+		pool = dynamicPool
 	}
 }

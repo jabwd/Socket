@@ -14,21 +14,21 @@ public enum SocketType {
 public class Socket {
     public weak var delegate: SocketDelegate?
 	public let fd: Int32
-    
+
     private let workQueue: DispatchQueue
     private(set) var socketType: SocketType = .server
-    
+
     private var readingSource: DispatchSourceRead?
     private var writingSource: DispatchSourceWrite?
     private var canWrite: Bool = false
     private var sendBuffer: [UInt8] = []
-    
+
     private var isOpen: Bool      = false
     private var shouldClose: Bool = false
     private var isReading: Bool   = false
     private var isWriting: Bool   = false
-	
-	public init() {
+
+    public init() {
 		#if os(Linux)
 			fd = Glibc.socket(AF_INET, Int32(SOCK_STREAM.rawValue), 0)
 		#else
@@ -36,22 +36,18 @@ public class Socket {
 		#endif
         workQueue = WorkQueuePool.shared.nextQueue
 	}
-	
-	private init(fd: Int32) {
+
+    private init(fd: Int32) {
 		self.fd = fd
         workQueue = WorkQueuePool.shared.nextQueue
-        makeNonBlocking(fd: fd)
-		
+        setNonBlocking()
 		isOpen = true
         createWritingSource()
 	}
-    
-    deinit {
-    }
-	
+
 	// MARK: - Listening
-	
-	public func startListening(port: UInt16) throws -> Void {
+
+	public func startListening(port: UInt16) throws {
         socketType = .server
 		var address        = sockaddr_in()
 		address.sin_family = sa_family_t(UInt16(AF_INET))
@@ -61,18 +57,18 @@ public class Socket {
 			address.sin_port = CFSwapInt16HostToBig(port)
 		#endif
 		address.sin_addr.s_addr = UInt32(0)
-		
+
 		// Allow quick reusage of the local address if applicable
 		var option: Int32 = 1
 		setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &option, UInt32(MemoryLayout<Int32>.size))
-		
+
 		let result = withUnsafePointer(to: &address) {
 			$0.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockAddress in
 				bind(fd, sockAddress, UInt32(MemoryLayout<sockaddr_in>.size))
 			}
 		}
 		guard result == 0 else {
-			switch(errno) {
+			switch errno {
 			case EBADF:
 				print("[\(type(of: self))] Error: Listen socket is a bad file descriptor!")
 				throw SocketError.invalidFileDescriptor
@@ -92,9 +88,7 @@ public class Socket {
 			throw SocketError.portInUse
 		}
 		print("[\(type(of: self))] Bound on port \(port)")
-		
-		makeNonBlocking(fd: fd)
-        
+        setNonBlocking()
         readingSource = DispatchSource.makeReadSource(fileDescriptor: fd, queue: workQueue)
         readingSource?.setEventHandler(handler: DispatchWorkItem(block: {
             self.acceptNewClient()
@@ -102,9 +96,9 @@ public class Socket {
         readingSource?.resume()
         isOpen = true
 	}
-    
+
     // MARK: - Connecting
-	
+
 	public func connect(host: String, port: UInt16) throws {
         socketType = .client
         var address = sockaddr_in()
@@ -119,19 +113,17 @@ public class Socket {
             }
         }
         memcpy(&address, info!.pointee.ai_addr, Int(MemoryLayout<sockaddr_in>.size))
-        
+
         var casted = address.asAddr()
         if Darwin.connect(fd, &casted, socklen_t(MemoryLayout<sockaddr_in>.size)) < 0 {
             print("[\(type(of: self))] Error: unable to connect to \(host) \(errno)")
             throw SocketError.unableToConnect
         }
-        
-        makeNonBlocking(fd: fd)
-        
+        setNonBlocking()
         createWritingSource()
         isOpen = true
 	}
-    
+
     public func disconnect() {
         guard isWriting == false, isReading == false else {
             shouldClose = true
@@ -139,12 +131,11 @@ public class Socket {
         }
         finalizeClose()
     }
-    
+
     private func finalizeClose() {
         isOpen = false
         delegate?.socketWillDisconnect(self)
         readingSource?.cancel()
-        
         shutdown(fd, SHUT_RDWR)
         close(fd)
         delegate?.socketDidDisconnect(self)
@@ -154,17 +145,18 @@ public class Socket {
 // MARK: - Reading and accepting
 
 extension Socket {
+
 	public func startReading() {
 		readingSource = DispatchSource.makeReadSource(fileDescriptor: fd, queue: workQueue)
-		readingSource?.setEventHandler() {
+		readingSource?.setEventHandler {
 			self.readAvailableData()
 		}
-		readingSource?.setCancelHandler() {
+		readingSource?.setCancelHandler {
 			self.readingSource = nil
 		}
 		readingSource?.resume()
 	}
-	
+
     func readAvailableData() {
         guard isOpen == true else {
             return
@@ -177,7 +169,7 @@ extension Socket {
 			}
 		}
         let buffSize = 2084
-        
+
         // Using UnsafeMutablePointer here crashes for some reason.
         var buffer: [UInt8] = [UInt8](repeating: 0, count: 0)
         var len = 0
@@ -187,15 +179,15 @@ extension Socket {
             if len > 0 {
                 buffer += Array(UnsafeMutableBufferPointer(start: part, count: len))
             }
-            part.deallocate(capacity: buffSize)
-        } while( len == buffSize );
+            part.deallocate()
+        } while( len == buffSize )
         if len <= 0 {
             disconnect()
             return
         }
         delegate?.socketDidReadBytes(self, bytes: buffer)
     }
-    
+
     func acceptNewClient() {
         guard isOpen == true else {
             return
@@ -205,17 +197,19 @@ extension Socket {
             print("[\(type(of: self))] Unable to accept new client \(errno)")
             return
         }
-        if( errno == EMFILE || errno == ENFILE ) {
-            let message = errno == EMFILE ? "Maximum of process connections has been reached" : "Maxmimum of system connections has been reached"
-            print("[\(type(of: self))] WARNING: \(message)")
+        if errno == EMFILE {
+            print("[\(type(of: self))] Maximum of process connections has been reached!!!")
             return
         }
-        if( errno == EBADF ) {
+        if errno == ENFILE {
+            print("[\(type(of: self))] WARNING: Maxmimum of system connections has been reached")
+            return
+        }
+        if errno == EBADF {
             print("[\(type(of: self))] Unable to accept new connection: bad file descriptor")
             close(client)
             return
         }
-        // TODO: Set up TLS support as well
         delegate?.socketDidAcceptNewClient(self, client: Socket(fd: client))
     }
 }
@@ -223,10 +217,10 @@ extension Socket {
 // MARK: - Writing data
 
 extension Socket {
-	
+
 	fileprivate func createWritingSource() {
 		guard writingSource == nil else { return }
-		
+
 		writingSource = DispatchSource.makeWriteSource(fileDescriptor: fd, queue: workQueue)
 		writingSource?.setEventHandler {
 			self.writingSource?.cancel()
@@ -238,13 +232,13 @@ extension Socket {
 		}
 		writingSource?.resume()
 	}
-    
+
     public func send(bytes: [UInt8]) {
 		guard bytes.count > 0 else { return }
         sendBuffer += bytes
 		checkWriteQueue()
     }
-    
+
     private func checkWriteQueue() {
         guard isOpen == true else {
             return
@@ -256,10 +250,10 @@ extension Socket {
         guard sendBuffer.count > 0 else { return }
         isWriting = true
         canWrite = false
-        
+
         let maxBufferSize = 20240
         let maxChunkSize = (maxBufferSize > sendBuffer.count) ? sendBuffer.count : maxBufferSize
-        
+
         var chunk = Array(sendBuffer[0..<maxChunkSize])
         let bytesWritten = write(fd, &chunk, chunk.count)
         if bytesWritten > 0 {
