@@ -33,7 +33,7 @@ public extension sockaddr_in {
     ///
     /// - Returns: sockaddr
     ///
-    public func asAddr() -> sockaddr {
+    func asAddr() -> sockaddr {
         var temp = self
         let addr = withUnsafePointer(to: &temp) {
             return UnsafeRawPointer($0)
