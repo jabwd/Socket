@@ -25,7 +25,7 @@ final class WorkQueuePool {
 	}
 
 	init() {
-        let num = sysconf(_SC_NPROCESSORS_ONLN)
+        let num = sysconf(Int32(_SC_NPROCESSORS_ONLN))
         guard num > 0 else {
             print("[Socket] Error: Unable to determine core count, falling back to 1 work queue.")
             pool = [
