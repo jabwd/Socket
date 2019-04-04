@@ -5,6 +5,9 @@
 //  Created by Antwan van Houdt on 27/02/2018.
 //
 import Dispatch
+#if os(Linux)
+import Glibc
+#endif
 
 final class WorkQueuePool {
     public static let shared = WorkQueuePool()

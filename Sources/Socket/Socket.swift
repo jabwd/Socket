@@ -115,10 +115,18 @@ public class Socket {
         memcpy(&address, info!.pointee.ai_addr, Int(MemoryLayout<sockaddr_in>.size))
 
         var casted = address.asAddr()
+        #if os(Linux)
+        if Glibc.connect(fd, &casted, socklen_t(MemoryLayout<sockaddr_in>.size)) < 0 {
+            print("[\(type(of: self))] Error: unable to connect to \(host) \(errno)")
+            throw SocketError.unableToConnect
+        }
+        #else
         if Darwin.connect(fd, &casted, socklen_t(MemoryLayout<sockaddr_in>.size)) < 0 {
             print("[\(type(of: self))] Error: unable to connect to \(host) \(errno)")
             throw SocketError.unableToConnect
         }
+        #endif
+
         setNonBlocking()
         createWritingSource()
         isOpen = true
@@ -136,7 +144,7 @@ public class Socket {
         isOpen = false
         delegate?.socketWillDisconnect(self)
         readingSource?.cancel()
-        shutdown(fd, SHUT_RDWR)
+        shutdown(fd, Int32(SHUT_RDWR))
         close(fd)
         delegate?.socketDidDisconnect(self)
     }

@@ -54,9 +54,6 @@ public class Connection {
 
 extension Connection: SocketDelegate {
     public func socketDidReadBytes(_ socket: Socket, bytes: [UInt8]) {
-        // let response = "HTTP/1.1 200 OK\r\nServer: Exurion (unix)\r\nConnection: closed"
-        // socket.send(bytes: Array(response.utf8))
-        // socket.disconnect()
         delegate?.connectionDidReceiveBytes(self, bytes: bytes)
     }
 
